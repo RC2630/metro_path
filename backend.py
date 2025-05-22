@@ -22,16 +22,17 @@ class Station:
 
 class Line:
 
-    def __init__(self: Line, name: str) -> None:
+    def __init__(self: Line, name: str, is_loop: bool) -> None:
         self.name: str = name
         self.stations: list[Station] = []
         self.stations_raw: list[str] = []
+        self.is_loop: bool = is_loop
 
     def get_station_index(self: Line, station: str) -> int:
         for i in range(len(self.stations)):
             if self.stations[i].name == station:
                 return i
-        raise RuntimeError("no station found")
+        raise RuntimeError(f"no station found: {station}")
 
 # ------------------------------------------------------------------
 
@@ -71,22 +72,30 @@ def get_station(station_list: list[Station], station: str) -> Station:
     for station_obj in station_list:
         if station_obj.name == station:
             return station_obj
-    raise RuntimeError("no station found")
+    raise RuntimeError(f"no station found: {station}")
 
 def get_line(line_list: list[Line], line: str) -> Line:
     for line_obj in line_list:
         if line_obj.name == line:
             return line_obj
-    raise RuntimeError("no line found")
+    raise RuntimeError(f"no line found: {line}")
 
 def get_lines_for_station_to_neighbour(station: Station, neighbour: Station) -> list[Line]:
+
     lines_in_common: list[Line] = intersection(station.lines, neighbour.lines)
     okay_lines: list[Line] = []
+
     for line in lines_in_common:
         station_index: int = line.get_station_index(station.name)
         neighbour_index: int = line.get_station_index(neighbour.name)
-        if abs(station_index - neighbour_index) == 1:
+
+        diff_is_1: bool = abs(station_index - neighbour_index) == 1
+        station_index_is_edge: bool = station_index in [0, len(line.stations) - 1]
+        neighbour_index_is_edge: bool = neighbour_index in [0, len(line.stations) - 1]
+
+        if diff_is_1 or (line.is_loop and station_index_is_edge and neighbour_index_is_edge):
             okay_lines.append(line)
+
     return okay_lines
 
 # ------------------------------------------------------------------
@@ -120,7 +129,7 @@ def pathfind_helper(start_station: Station, end_station: Station) -> list[Statio
             return curr
         for neighbour in curr[-1].neighbours:
             frontier.put(curr + [neighbour])
-    raise RuntimeError("no path found")
+    raise RuntimeError(f"no path found: {start_station.name} -> {end_station.name}")
 
 def simplify(path: Path) -> None:
     index: int = 0

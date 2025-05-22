@@ -31,7 +31,10 @@ def init_lines_stations() -> None:
     for content_line in content:
         parsed_line: str = content_line[0][:-1]
         parsed_stations: list[str] = content_line[1:]
-        init_line_with_stations(parsed_line, parsed_stations)
+        if parsed_stations[-1] == "$loop":
+            init_line_with_stations(parsed_line, parsed_stations[:-1], True)
+        else:
+            init_line_with_stations(parsed_line, parsed_stations, False)
 
     for line in LINES:
         for station_raw in line.stations_raw:
@@ -43,35 +46,59 @@ def init_lines_stations() -> None:
         for neighbour_raw in station.neighbours_raw:
             station.neighbours.append(get_station(STATIONS, neighbour_raw))
 
-def init_line_with_stations(line: str, stations: list[str]) -> None:
-    new_line: Line = Line(line)
+def init_line_with_stations(line: str, stations: list[str], is_loop: bool) -> None:
+
+    new_line: Line = Line(line, is_loop)
     for i in range(len(stations)):
+
         station_name: str = stations[i]
         contains: bool = contains_station(STATIONS, station_name)
         station: Station = \
             get_station(STATIONS, station_name) if contains else Station(station_name)
         station.lines_raw.append(line)
         new_line.stations_raw.append(station_name)
+
         if i != 0:
             append_if_not_present(station.neighbours_raw, stations[i - 1])
         if i != len(stations) - 1:
             append_if_not_present(station.neighbours_raw, stations[i + 1])
         if not contains:
             STATIONS.append(station)
+    
+    if new_line.is_loop:
+        first_station: Station = get_station(STATIONS, new_line.stations_raw[0])
+        last_station: Station = get_station(STATIONS, new_line.stations_raw[-1])
+        append_if_not_present(first_station.neighbours_raw, last_station.name)
+        append_if_not_present(last_station.neighbours_raw, first_station.name)
+
     LINES.append(new_line)
 
 def display_lines() -> None:
+
     for line in LINES:
         print(f"\nLINE {line.name}:")
+        loop_transfer_list_msg_save: str = ""
+
         for i in range(len(line.stations)):
             current_station: Station = line.stations[i]
             print(f"{i + 1}. {current_station.name}", end = "")
             if len(current_station.lines) >= 2:
                 transfer_list: list[str] = [l.name for l in current_station.lines if l != line]
                 line_wording: str = "line" if len(transfer_list) == 1 else "lines"
-                print(f" (can transfer to {line_wording} {', '.join(transfer_list)})")
+                transfer_list_msg: str = \
+                    f" (can transfer to {line_wording} {', '.join(transfer_list)})"
+                if line.is_loop and i == 0:
+                    loop_transfer_list_msg_save = transfer_list_msg
+                print(transfer_list_msg)
             else:
                 print()
+
+        if line.is_loop:
+            loop_around_station: Station = line.stations[0]
+            print(
+                f"{len(line.stations) + 1}. {loop_around_station.name} "
+                f"[loop-around]{loop_transfer_list_msg_save}"
+            )
 
 def display_stations() -> None:
     for station in STATIONS:
@@ -91,7 +118,10 @@ def find_path() -> None:
         end_station = input("This station does not exist. Try again: ")
     
     if start_station == end_station:
-        print("\nSince the starting and destination stations are the same, the path is trivial. Have fun travelling to nowhere, lol!")
+        print(
+            "\nSince the starting and destination stations are the same, the path is trivial. "
+            "Have fun travelling to nowhere, lol!"
+        )
         return
     
     path: Path = find_shortest_path(
